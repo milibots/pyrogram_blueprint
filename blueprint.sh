@@ -1,21 +1,51 @@
 #!/bin/bash
 
+# ==========================================
+# 0. INTERACTIVE PROMPTS
+# ==========================================
+
 # Ask for the project name
 read -p "Enter project name (e.g., milad): " PROJ_NAME
-
-# If no name is provided, default to 'my_bot'
 if [ -z "$PROJ_NAME" ]; then
   PROJ_NAME="my_bot"
 fi
 
-echo "🚀 Creating blueprint in directory: $PROJ_NAME"
+# Ask to install OS dependencies for TgCrypto
+read -p "Do you want to install python3-dev and build-essential to fix TgCrypto? (y/n): " FIX_TGCRYPTO
 
-# Create directories
+# Ask to create a virtual environment
+read -p "Do you want to make a venv inside the directory? (y/n): " MAKE_VENV
+
+# Ask to install Python packages
+read -p "Do you want to install python packages here? (y/n): " INSTALL_PKGS
+
+echo ""
+echo "🚀 Setting up blueprint for: $PROJ_NAME"
+echo "--------------------------------------------------------"
+
+# ==========================================
+# 1. OS DEPENDENCIES & SHORTCUTS
+# ==========================================
+
+if [[ "$FIX_TGCRYPTO" =~ ^[Yy]$ ]]; then
+    echo "📦 Installing build-essential, python3-dev, and python3-venv..."
+    sudo apt update
+    sudo apt install -y build-essential python3-dev python3-venv
+    echo "✅ OS Dependencies installed."
+fi
+
+echo "🚀 Installing shell shortcuts (milibots/install-shortcuts)..."
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/milibots/install-shortcuts/main/install.sh)"
+
+# ==========================================
+# 2. CREATE DIRECTORIES
+# ==========================================
+
 mkdir -p "$PROJ_NAME/helpers"
 mkdir -p "$PROJ_NAME/plugins"
 
 # ==========================================
-# 1. ROOT FILES
+# 3. ROOT FILES
 # ==========================================
 
 # .env
@@ -25,12 +55,14 @@ API_HASH=your_api_hash_here
 BOT_TOKEN=your_bot_token_here
 EOF
 
-# requirements.txt
+# requirements.txt (Using Kurigram instead of pyrogram)
 cat << 'EOF' > "$PROJ_NAME/requirements.txt"
-pyrogram
+Kurigram
 TgCrypto
-SQLAlchemy
+python-dotenv
 python-decouple
+Flask
+SQLAlchemy
 EOF
 
 # settings.json
@@ -122,7 +154,7 @@ EOF
 
 
 # ==========================================
-# 2. HELPERS FOLDER
+# 4. HELPERS FOLDER
 # ==========================================
 
 # helpers/__init__.py
@@ -198,7 +230,6 @@ def ensure_user(func):
             if user.is_banned:
                 return
 
-            # Attach user to the update object so handlers can access it
             update.db_user = user
             return await func(client, update, *args, **kwargs)
 
@@ -226,7 +257,7 @@ EOF
 
 
 # ==========================================
-# 3. PLUGINS FOLDER
+# 5. PLUGINS FOLDER
 # ==========================================
 
 # plugins/__init__.py
@@ -261,12 +292,45 @@ async def about_callback(client: Client, callback: CallbackQuery):
     await callback.answer("این یک ربات پایه ساخته شده با Blueprint است!", show_alert=True)
 EOF
 
+# ==========================================
+# 6. VIRTUAL ENVIRONMENT & PIP PACKAGES
+# ==========================================
+
+cd "$PROJ_NAME" || exit
+
+if [[ "$MAKE_VENV" =~ ^[Yy]$ ]]; then
+    echo "🐍 Creating Virtual Environment..."
+    python3 -m venv venv
+    echo "✅ Venv created."
+fi
+
+if [[ "$INSTALL_PKGS" =~ ^[Yy]$ ]]; then
+    echo "📦 Installing Python packages (Kurigram, Flask, SQLAlchemy, TgCrypto, etc)..."
+    if [[ "$MAKE_VENV" =~ ^[Yy]$ ]]; then
+        source venv/bin/activate
+        pip install -r requirements.txt
+        deactivate
+    else
+        pip3 install -r requirements.txt
+    fi
+    echo "✅ Python packages installed."
+fi
+
+# ==========================================
+# 7. FINISH
+# ==========================================
+
 echo ""
 echo "✅ Blueprint generated successfully in './$PROJ_NAME'."
 echo "--------------------------------------------------------"
 echo "To get started:"
 echo "1. cd $PROJ_NAME"
-echo "2. Edit .env file and add your BOT_TOKEN, API_ID, API_HASH"
-echo "3. pip install -r requirements.txt"
-echo "4. python3 main.py"
+if [[ "$MAKE_VENV" =~ ^[Yy]$ ]]; then
+    echo "2. source venv/bin/activate"
+    echo "3. nano .env (Add BOT_TOKEN, API_ID, API_HASH)"
+    echo "4. python3 main.py"
+else
+    echo "2. nano .env (Add BOT_TOKEN, API_ID, API_HASH)"
+    echo "3. python3 main.py"
+fi
 echo "--------------------------------------------------------"
